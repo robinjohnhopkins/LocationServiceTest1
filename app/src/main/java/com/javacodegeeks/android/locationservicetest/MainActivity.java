@@ -14,6 +14,7 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -38,17 +39,22 @@ public class MainActivity extends Activity {
 	  private MyLocationListener mylistener;
 	  private Criteria criteria;
 	  private PostClass postclass;
-	  
-	/** Called when the activity is first created. */
+	  private Location lastLocation;
+	  private EditText urlPrefix;
+	  /** Called when the activity is first created. */
 
 	  @Override
 	  public void onCreate(Bundle savedInstanceState) {
 		  super.onCreate(savedInstanceState);
 		  setContentView(R.layout.activity_main);
+
 		  latitude = (TextView) findViewById(R.id.lat);
 		  longitude = (TextView) findViewById(R.id.lon);
 		  provText = (TextView) findViewById(R.id.prov);
 		  choice = (TextView) findViewById(R.id.choice);
+          urlPrefix = (EditText) findViewById(R.id.urlPrefixInput);
+
+
 		  fineAcc = (CheckBox) findViewById(R.id.fineAccuracy);
 		  choose = (Button) findViewById(R.id.chooseRadio);
           postclass = null;
@@ -79,12 +85,12 @@ public class MainActivity extends Activity {
 		  provider = locationManager.getBestProvider(criteria, false);
 	    
 		  // the last known location of this provider
-		  Location location = locationManager.getLastKnownLocation(provider);
+          lastLocation = locationManager.getLastKnownLocation(provider);
 
 		  mylistener = new MyLocationListener();
 	
-		  if (location != null) {
-			  mylistener.onLocationChanged(location);
+		  if (lastLocation != null) {
+			  mylistener.onLocationChanged(lastLocation);
 		  } else {
 			  // leads to the settings because there is no last known location
 			  Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
@@ -98,7 +104,8 @@ public class MainActivity extends Activity {
 	
 		  @Override
 		  public void onLocationChanged(Location location) {
-			// Initialize the location fields
+			  // Initialize the location fields
+
 			  latitude.setText("Latitude: "+String.valueOf(location.getLatitude()));
 			  longitude.setText("Longitude: "+String.valueOf(location.getLongitude()));
 			  provText.setText(provider + " provider has been selected.");
@@ -132,43 +139,51 @@ public class MainActivity extends Activity {
 		@Override
 		protected Void doInBackground(String... params) {
 			try {
+                if (lastLocation != null) {
+                    final TextView outputView = (TextView) findViewById(R.id.choice);
+                    String urlString = "https://" + urlPrefix.getText() + ".ngrok.io/postposition";
+                    //URL url = new URL("https://4b4f0026.ngrok.io/postposition");
+                    URL url = new URL(urlString);
 
-				final TextView outputView = (TextView) findViewById(R.id.choice);
-				URL url = new URL("https://4b4f0026.ngrok.io/postposition");
+                    HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+                    //String urlParameters = "sn=C02G8416DRJM&cn=&locale=&caller=&num=12345";
+                    //String urlParameters = "lat=0.123456&lon=52.12345";
+                    String urlParameters = "lat=" + String.valueOf(lastLocation.getLatitude()) +
+                            ",lon=" + String.valueOf(lastLocation.getLongitude()) +
+                            ",acc=" + String.valueOf(lastLocation.getAccuracy());
 
-				HttpsURLConnection connection = (HttpsURLConnection)url.openConnection();
-				//String urlParameters = "sn=C02G8416DRJM&cn=&locale=&caller=&num=12345";
-				String urlParameters = "lat=0.123456&lon=52.12345";
-				connection.setRequestMethod("POST");
-				connection.setRequestProperty("USER-AGENT", "Mozilla/5.0");
-				connection.setRequestProperty("ACCEPT-LANGUAGE", "en-US,en;0.5");
-				connection.setDoOutput(true);
-				DataOutputStream dStream = new DataOutputStream(connection.getOutputStream());
-				dStream.writeBytes(urlParameters);
-				dStream.flush();
-				dStream.close();
-				int responseCode = connection.getResponseCode();
-				final StringBuilder output = new StringBuilder("Request URL " + url);
-				output.append(System.getProperty("line.separator") + "Request Parameters " + urlParameters);
-				output.append(System.getProperty("line.separator")  + "Response Code " + responseCode);
-				BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-				String line = "";
-				StringBuilder responseOutput = new StringBuilder();
-				while((line = br.readLine()) != null ) {
-					responseOutput.append(line);
-				}
-				br.close();
+                    connection.setRequestMethod("POST");
+                    connection.setRequestProperty("USER-AGENT", "Mozilla/5.0");
+                    connection.setRequestProperty("ACCEPT-LANGUAGE", "en-US,en;0.5");
+                    connection.setDoOutput(true);
+                    DataOutputStream dStream = new DataOutputStream(connection.getOutputStream());
+                    dStream.writeBytes(urlParameters);
+                    dStream.flush();
+                    dStream.close();
+                    int responseCode = connection.getResponseCode();
+                    final StringBuilder output = new StringBuilder("Request URL " + url);
+                    output.append(System.getProperty("line.separator") + "Request Parameters " + urlParameters);
+                    output.append(System.getProperty("line.separator") + "Response Code " + responseCode);
+                    BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                    String line = "";
+                    StringBuilder responseOutput = new StringBuilder();
+                    while ((line = br.readLine()) != null) {
+                        responseOutput.append(line);
+                    }
+                    br.close();
 
-				output.append(System.getProperty("line.separator") + "Response " + System.getProperty("line.separator") + System.getProperty("line.separator") + responseOutput.toString());
+                    output.append(System.getProperty("line.separator") + "Response " + System.getProperty("line.separator") + System.getProperty("line.separator") + responseOutput.toString());
 
-				MainActivity.this.runOnUiThread(new Runnable() {
+                    MainActivity.this.runOnUiThread(new Runnable() {
 
-					@Override
-					public void run() {
-						outputView.setText(output);;
+                        @Override
+                        public void run() {
+                            outputView.setText(output);
+                            ;
 
-					}
-				});
+                        }
+                    });
+                }
 			} catch (MalformedURLException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
